@@ -63,9 +63,13 @@ class MainViewModel : ViewModel() {
         viewModelScope.launch {
             isCompiling = true
 
+            // Limpiar caracteres invisibles antes de cualquier análisis
+            val expresion = Regex("[\\u200B-\\u200D\\uFEFF\\p{C}&&[^\\n\\r\\t]]")
+            val cleanCode = code.replace(expresion, "")
+
             // El análisis se corre en un hilo de fondo para no bloquear la UI
             val result = withContext(Dispatchers.Default) {
-                ParserRunner.run(code)
+                ParserRunner.run(cleanCode)
             }
 
             tokens    = result.tokens
@@ -80,7 +84,7 @@ class MainViewModel : ViewModel() {
                ──────────────────────────────────────────────────── */
             if (!hasErrors) {
                 val generatedDiagram = withContext(Dispatchers.Default) {
-                    DiagramGenerator.generate(code)
+                    DiagramGenerator.generate(cleanCode)  // usar código limpio
                 }
                 diagram = generatedDiagram
             } else {

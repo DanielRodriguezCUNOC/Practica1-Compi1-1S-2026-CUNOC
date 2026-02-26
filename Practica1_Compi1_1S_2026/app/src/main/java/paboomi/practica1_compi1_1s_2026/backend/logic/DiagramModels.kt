@@ -84,13 +84,35 @@ data class SymbolData(
 )
 
 /**
+ * Ocurrencia de un operador aritmético en el código.
+ */
+data class OperatorOccurrence(
+    val operator: String,   // "Suma", "Resta", "Multiplicación", "División"
+    val symbol: String,     // "+", "-", "*", "/"
+    val line: Int,
+    val column: Int,
+    val occurrence: String  // línea original para contexto
+)
+
+/**
+ * Estructura de control encontrada en el código.
+ */
+data class ControlStructure(
+    val type: String,       // "SI", "MIENTRAS"
+    val line: Int,
+    val condition: String
+)
+
+/**
  * Resultado del generador de diagramas.
  * Contiene los nodos y conexiones necesarias para renderizar.
  */
 data class DiagramResult(
     val nodes: List<DiagramNode>,
     val connections: List<DiagramConnection>,
-    val symbols: List<SymbolData> = emptyList()
+    val symbols: List<SymbolData> = emptyList(),
+    val operators: List<OperatorOccurrence> = emptyList(),
+    val controlStructures: List<ControlStructure> = emptyList()
 ) {
     val isEmpty: Boolean get() = nodes.isEmpty()
     val nodeCount: Int get() = nodes.size
