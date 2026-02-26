@@ -1,0 +1,176 @@
+package paboomi.practica1_compi1_1s_2026.backend.analyzer;
+import java_cup.runtime.*;
+
+parser code {:
+    // Métodos para reporte de errores sintácticos
+    public void syntax_error(Symbol s) {
+        System.err.println("Error sintáctico en línea " + s.left + ", columna " + s.right + ": símbolo no esperado '" + s.value + "'");
+    }
+    
+    public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception {
+        System.err.println("Error sintáctico irrecuperable en línea " + s.left + ", columna " + s.right);
+        throw new Exception("Error sintáctico");
+    }
+:}
+
+/* Terminales */
+terminal INICIO, FIN, VAR, SI, ENTONCES, FINSI, MIENTRAS, HACER, FINMIENTRAS, MOSTRAR, LEER;
+terminal SEP_SECCIONES;
+terminal MAS, MENOS, POR, DIV, ASIG, PAR_IZQ, PAR_DER;
+terminal IGUALDAD, DIFERENTE, MAYOR, MENOR, MAYOR_IGUAL, MENOR_IGUAL;
+terminal AND, OR, NOT;
+terminal PIPE, COMA;
+terminal CONF_DEFAULT, CONF_COLOR_TEXTO_SI, CONF_COLOR_SI, CONF_FIGURA_SI, CONF_LETRA_SI, CONF_LETRA_SIZE_SI;
+terminal CONF_COLOR_TEXTO_MIENTRAS, CONF_COLOR_MIENTRAS, CONF_FIGURA_MIENTRAS, CONF_LETRA_MIENTRAS, CONF_LETRA_SIZE_MIENTRAS;
+terminal CONF_COLOR_TEXTO_BLOQUE, CONF_COLOR_BLOQUE, CONF_FIGURA_BLOQUE, CONF_LETRA_BLOQUE, CONF_LETRA_SIZE_BLOQUE;
+terminal FIG_ELIPSE, FIG_CIRCULO, FIG_PARALELOGRAMO, FIG_RECTANGULO, FIG_ROMBO, FIG_RECTANGULO_REDONDEADO;
+terminal FONT_ARIAL, FONT_TIMES_NEW_ROMAN, FONT_COMIC_SANS, FONT_VERDANA;
+terminal String ID, CADENA, ENTERO, DECIMAL, HEX;
+
+/* No Terminales */
+non terminal programa, seccion_algoritmo, seccion_config;
+non terminal lista_instrucciones, instruccion;
+non terminal dec_var, asig_var, sent_si, sent_mientras, sent_mostrar, sent_leer;
+non terminal condicion, expresion_relacional;
+non terminal expresion;
+non terminal lista_configuraciones, instruccion_config;
+non terminal figura_val, font_val, color_val;
+
+/* Precedencia de Operadores */
+precedence left OR;
+precedence left AND;
+precedence left IGUALDAD, DIFERENTE, MAYOR, MENOR, MAYOR_IGUAL, MENOR_IGUAL;
+precedence left MAS, MENOS;
+precedence left POR, DIV;
+precedence right NOT;
+precedence nonassoc PAR_IZQ, PAR_DER;
+
+start with programa;
+
+/* ==================== SECCIÓN DE ALGORITMO ==================== */
+
+programa ::= seccion_algoritmo SEP_SECCIONES seccion_config
+           | seccion_algoritmo
+           ;
+
+seccion_algoritmo ::= INICIO lista_instrucciones FIN 
+                    | INICIO FIN
+                    ;
+
+lista_instrucciones ::= lista_instrucciones instruccion
+                      | instruccion
+                      ;
+
+instruccion ::= dec_var 
+              | asig_var 
+              | sent_si 
+              | sent_mientras 
+              | sent_mostrar 
+              | sent_leer
+              ;
+
+dec_var ::= VAR ID
+          | VAR ID ASIG expresion
+          ;
+
+asig_var ::= ID ASIG expresion ;
+
+sent_si ::= SI PAR_IZQ condicion PAR_DER ENTONCES lista_instrucciones FINSI ;
+
+sent_mientras ::= MIENTRAS PAR_IZQ condicion PAR_DER HACER lista_instrucciones FINMIENTRAS ;
+
+sent_mostrar ::= MOSTRAR CADENA 
+               | MOSTRAR expresion
+               ;
+
+sent_leer ::= LEER ID ;
+
+/* Expresiones Aritméticas */
+expresion ::= expresion MAS expresion
+            | expresion MENOS expresion
+            | expresion POR expresion
+            | expresion DIV expresion
+            | PAR_IZQ expresion PAR_DER
+            | ENTERO
+            | DECIMAL
+            | ID
+            ;
+
+/* Condiciones Lógicas y Relacionales */
+condicion ::= condicion AND condicion
+            | condicion OR condicion
+            | NOT condicion
+            | expresion_relacional
+            | PAR_IZQ condicion PAR_DER
+            ;
+
+expresion_relacional ::= expresion IGUALDAD expresion
+                       | expresion DIFERENTE expresion
+                       | expresion MAYOR expresion
+                       | expresion MENOR expresion
+                       | expresion MAYOR_IGUAL expresion
+                       | expresion MENOR_IGUAL expresion
+                       ;
+
+/* ==================== SECCIÓN DE CONFIGURACIÓN ==================== */
+
+seccion_config ::= lista_configuraciones ;
+
+lista_configuraciones ::= lista_configuraciones instruccion_config
+                        | instruccion_config
+                        ;
+
+instruccion_config ::= CONF_DEFAULT ASIG expresion
+                     | CONF_DEFAULT ASIG expresion PIPE expresion
+                     | CONF_COLOR_TEXTO_SI ASIG color_val
+                     | CONF_COLOR_TEXTO_SI ASIG color_val PIPE expresion
+                     | CONF_COLOR_SI ASIG color_val
+                     | CONF_COLOR_SI ASIG color_val PIPE expresion
+                     | CONF_FIGURA_SI ASIG figura_val
+                     | CONF_FIGURA_SI ASIG figura_val PIPE expresion
+                     | CONF_LETRA_SI ASIG font_val
+                     | CONF_LETRA_SI ASIG font_val PIPE expresion
+                     | CONF_LETRA_SIZE_SI ASIG expresion
+                     | CONF_LETRA_SIZE_SI ASIG expresion PIPE expresion
+                     | CONF_COLOR_TEXTO_MIENTRAS ASIG color_val
+                     | CONF_COLOR_TEXTO_MIENTRAS ASIG color_val PIPE expresion
+                     | CONF_COLOR_MIENTRAS ASIG color_val
+                     | CONF_COLOR_MIENTRAS ASIG color_val PIPE expresion
+                     | CONF_FIGURA_MIENTRAS ASIG figura_val
+                     | CONF_FIGURA_MIENTRAS ASIG figura_val PIPE expresion
+                     | CONF_LETRA_MIENTRAS ASIG font_val
+                     | CONF_LETRA_MIENTRAS ASIG font_val PIPE expresion
+                     | CONF_LETRA_SIZE_MIENTRAS ASIG expresion
+                     | CONF_LETRA_SIZE_MIENTRAS ASIG expresion PIPE expresion
+                     | CONF_COLOR_TEXTO_BLOQUE ASIG color_val
+                     | CONF_COLOR_TEXTO_BLOQUE ASIG color_val PIPE expresion
+                     | CONF_COLOR_BLOQUE ASIG color_val
+                     | CONF_COLOR_BLOQUE ASIG color_val PIPE expresion
+                     | CONF_FIGURA_BLOQUE ASIG figura_val
+                     | CONF_FIGURA_BLOQUE ASIG figura_val PIPE expresion
+                     | CONF_LETRA_BLOQUE ASIG font_val
+                     | CONF_LETRA_BLOQUE ASIG font_val PIPE expresion
+                     | CONF_LETRA_SIZE_BLOQUE ASIG expresion
+                     | CONF_LETRA_SIZE_BLOQUE ASIG expresion PIPE expresion
+                     ;
+
+/* Valores de Colores: RGB o Hexadecimal */
+color_val ::= expresion COMA expresion COMA expresion
+            | HEX
+            ;
+
+/* Valores de Figuras */
+figura_val ::= FIG_ELIPSE 
+             | FIG_CIRCULO 
+             | FIG_PARALELOGRAMO 
+             | FIG_RECTANGULO 
+             | FIG_ROMBO 
+             | FIG_RECTANGULO_REDONDEADO
+             ;
+
+/* Valores de Fuentes */
+font_val ::= FONT_ARIAL 
+           | FONT_TIMES_NEW_ROMAN 
+           | FONT_COMIC_SANS 
+           | FONT_VERDANA
+           ;
