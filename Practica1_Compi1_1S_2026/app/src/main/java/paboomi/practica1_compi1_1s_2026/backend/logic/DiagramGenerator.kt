@@ -6,8 +6,10 @@ import androidx.compose.ui.unit.dp
  * Patrón Experto: DiagramGenerator es el responsable de convertir
  * pseudocódigo en nodos y conexiones de diagrama de flujo.
  *
- * Simplificación académica: parsea el código línea por línea sin
- * construir un AST completo, reconociendo patrones de palabras clave.
+ * Características:
+ * - Parsea código línea por línea
+ * - Maneja ramificaciones (SI/MIENTRAS) con caminos Sí/No
+ * - Para bucles MIENTRAS: genera línea de regreso a la decisión
  */
 object DiagramGenerator {
 
@@ -24,10 +26,13 @@ object DiagramGenerator {
             .map { it.trim() }
             .filter { it.isNotEmpty() && !it.startsWith("%") }
 
-        // Rastreamos niveles de anidamiento para posicionar los nodos
         var nodeId = 0
         var yPos = 0.dp
-        val nodeStack = mutableListOf<Int>()  // Para conectar nodos
+
+        // Stack para manejar anidamiento: (nodeId de la decisión, tipo: "SI" o "MIENTRAS")
+        data class ControlNode(val nodeId: Int, val type: String)
+        val controlStack = mutableListOf<ControlNode>()
+        val lastNodeStack = mutableListOf<Int>()  // Último nodo ejecutado en cada nivel
 
         // === NODO DE INICIO ===
         val startNode = DiagramNode(
@@ -38,32 +43,208 @@ object DiagramGenerator {
             y = yPos,
             width = 80.dp,
             height = 50.dp,
-            fillColor = androidx.compose.ui.graphics.Color(0xFFE8F5E9)  // Verde
+            fillColor = androidx.compose.ui.graphics.Color(0xFFE8F5E9)
         )
         nodes.add(startNode)
-        nodeStack.add(nodeId)
+        lastNodeStack.add(nodeId)
         nodeId++
         yPos += 80.dp
 
         // === PROCESAMIENTO DE LÍNEAS ===
+        var inSiBlock = false
+        var siNodeId = -1
+
         for (line in lines) {
-            // Saltar INICIO y FIN que ya están procesados
+            // Saltar INICIO y FIN
             if (line == "INICIO" || line == "FIN" || line.isEmpty() || line == "%%%%") {
                 continue
             }
 
-            val (newNodes, newConnections, nextNodeId, nextYPos) = processLine(
-                line, nodeId, yPos, nodeStack, config
-            )
+            when {
+                line.startsWith("SI", ignoreCase = true) -> {
+                    val condition = extractCondition(line)
+                    val lastId = lastNodeStack.lastOrNull() ?: 0
 
-            nodes.addAll(newNodes)
-            connections.addAll(newConnections)
-            nodeId = nextNodeId
-            yPos = nextYPos
+                    val siNode = DiagramNode(
+                        id = nodeId,
+                        type = ShapeType.DIAMOND,
+                        label = "¿$condition?",
+                        x = 50.dp,
+                        y = yPos,
+                        width = 120.dp,
+                        height = 80.dp,
+                        textColor = config.siTextColor,
+                        fillColor = config.siBackColor
+                    )
+                    nodes.add(siNode)
+                    // Conexión normal desde el nodo anterior
+                    connections.add(DiagramConnection(lastId, nodeId))
+
+                    controlStack.add(ControlNode(nodeId, "SI"))
+                    siNodeId = nodeId
+                    nodeId++
+                    yPos += 120.dp
+                    inSiBlock = true
+                }
+
+                line.startsWith("MIENTRAS", ignoreCase = true) -> {
+                    val condition = extractCondition(line)
+                    val lastId = lastNodeStack.lastOrNull() ?: 0
+
+                    val whileNode = DiagramNode(
+                        id = nodeId,
+                        type = ShapeType.DIAMOND,
+                        label = "¿$condition?",
+                        x = 50.dp,
+                        y = yPos,
+                        width = 120.dp,
+                        height = 80.dp,
+                        textColor = config.mientrasTextColor,
+                        fillColor = config.mientrasBackColor
+                    )
+                    nodes.add(whileNode)
+                    connections.add(DiagramConnection(lastId, nodeId))
+
+                    controlStack.add(ControlNode(nodeId, "MIENTRAS"))
+                    siNodeId = nodeId
+                    nodeId++
+                    yPos += 120.dp
+                }
+
+                line.startsWith("MOSTRAR", ignoreCase = true) -> {
+                    val message = extractMessage(line)
+                    val lastId = lastNodeStack.lastOrNull() ?: 0
+
+                    val displayNode = DiagramNode(
+                        id = nodeId,
+                        type = ShapeType.PARALLELOGRAM,
+                        label = "Mostrar\n$message",
+                        x = 50.dp,
+                        y = yPos,
+                        width = 100.dp,
+                        height = 70.dp,
+                        textColor = config.bloqueTextColor,
+                        fillColor = config.bloqueBackColor
+                    )
+                    nodes.add(displayNode)
+
+                    // Si estamos dentro de un SI, conectar con "Sí"
+                    if (inSiBlock && siNodeId != -1) {
+                        connections.add(DiagramConnection(siNodeId, nodeId, "Sí"))
+                        inSiBlock = false
+                    } else {
+                        connections.add(DiagramConnection(lastId, nodeId))
+                    }
+
+                    lastNodeStack.clear()
+                    lastNodeStack.add(nodeId)
+                    nodeId++
+                    yPos += 100.dp
+                }
+
+                line.startsWith("LEER", ignoreCase = true) -> {
+                    val varName = extractVariable(line)
+                    val lastId = lastNodeStack.lastOrNull() ?: 0
+
+                    val readNode = DiagramNode(
+                        id = nodeId,
+                        type = ShapeType.PARALLELOGRAM,
+                        label = "Leer\n$varName",
+                        x = 50.dp,
+                        y = yPos,
+                        width = 100.dp,
+                        height = 70.dp,
+                        textColor = config.bloqueTextColor,
+                        fillColor = config.bloqueBackColor
+                    )
+                    nodes.add(readNode)
+                    connections.add(DiagramConnection(lastId, nodeId))
+
+                    lastNodeStack.clear()
+                    lastNodeStack.add(nodeId)
+                    nodeId++
+                    yPos += 100.dp
+                }
+
+                line.startsWith("VAR", ignoreCase = true) ||
+                line.contains("=") -> {
+                    val label = if (line.length > 30) {
+                        line.take(27) + "..."
+                    } else {
+                        line
+                    }
+                    val lastId = lastNodeStack.lastOrNull() ?: 0
+
+                    val instructionNode = DiagramNode(
+                        id = nodeId,
+                        type = ShapeType.RECTANGLE,
+                        label = label,
+                        x = 50.dp,
+                        y = yPos,
+                        width = 120.dp,
+                        height = 60.dp,
+                        textColor = config.bloqueTextColor,
+                        fillColor = config.bloqueBackColor
+                    )
+                    nodes.add(instructionNode)
+
+                    if (inSiBlock && siNodeId != -1) {
+                        connections.add(DiagramConnection(siNodeId, nodeId, "Sí"))
+                        inSiBlock = false
+                    } else {
+                        connections.add(DiagramConnection(lastId, nodeId))
+                    }
+
+                    lastNodeStack.clear()
+                    lastNodeStack.add(nodeId)
+                    nodeId++
+                    yPos += 90.dp
+                }
+
+                line.startsWith("FINSI", ignoreCase = true) -> {
+                    // Cierre de SI: generar rama "No"
+                    if (controlStack.isNotEmpty() && controlStack.last().type == "SI") {
+                        val siControl = controlStack.removeAt(controlStack.size - 1)
+                        val nextId = nodeId  // Próximo nodo que se ejecutará
+
+                        // Conexión "No" del SI al siguiente nodo
+                        // (se actualiza cuando se cree el siguiente nodo)
+                        connections.add(DiagramConnection(siControl.nodeId, nextId, "No"))
+
+                        lastNodeStack.clear()
+                        lastNodeStack.add(nextId - 1)  // Apunta al último procesado
+                    }
+                    siNodeId = -1
+                    inSiBlock = false
+                }
+
+                line.startsWith("FINMIENTRAS", ignoreCase = true) -> {
+                    // Cierre de MIENTRAS: generar rama de regreso
+                    if (controlStack.isNotEmpty() && controlStack.last().type == "MIENTRAS") {
+                        val whileControl = controlStack.removeAt(controlStack.size - 1)
+
+                        // Conexión "No" que sale del bucle
+                        connections.add(DiagramConnection(whileControl.nodeId, nodeId, "No"))
+
+                        // Conexión de regreso al inicio del bucle (desde el último nodo del cuerpo)
+                        val lastBodyNode = lastNodeStack.lastOrNull() ?: nodeId
+                        connections.add(DiagramConnection(lastBodyNode, whileControl.nodeId, "Regresa"))
+
+                        lastNodeStack.clear()
+                        lastNodeStack.add(nodeId)
+                    }
+                    siNodeId = -1
+                    inSiBlock = false
+                }
+
+                else -> {
+                    // Línea no reconocida
+                }
+            }
         }
 
         // === NODO DE FIN ===
-        val lastNodeId = nodeStack.lastOrNull() ?: (nodeId - 1)
+        val lastNodeId = lastNodeStack.lastOrNull() ?: (nodeId - 1)
         val endNode = DiagramNode(
             id = nodeId,
             type = ShapeType.OVAL,
@@ -72,159 +253,12 @@ object DiagramGenerator {
             y = yPos,
             width = 80.dp,
             height = 50.dp,
-            fillColor = androidx.compose.ui.graphics.Color(0xFFFFEBEE)  // Rojo claro
+            fillColor = androidx.compose.ui.graphics.Color(0xFFFFEBEE)
         )
         nodes.add(endNode)
         connections.add(DiagramConnection(lastNodeId, nodeId))
 
         return DiagramResult(nodes, connections)
-    }
-
-    /**
-     * Procesa una línea del código y retorna los nodos generados,
-     * conexiones, y la siguiente posición para el próximo nodo.
-     */
-    private fun processLine(
-        line: String,
-        startNodeId: Int,
-        startYPos: androidx.compose.ui.unit.Dp,
-        nodeStack: MutableList<Int>,
-        config: DiagramConfig
-    ): Tuple4 {
-        val nodes = mutableListOf<DiagramNode>()
-        val connections = mutableListOf<DiagramConnection>()
-        var nodeId = startNodeId
-        var yPos = startYPos
-        val lastNodeId = nodeStack.lastOrNull() ?: (startNodeId - 1)
-
-        when {
-            // ──── SI (Decisión) ────
-            line.startsWith("SI", ignoreCase = true) -> {
-                val condition = extractCondition(line)
-                val siNode = DiagramNode(
-                    id = nodeId,
-                    type = config.siFigure,
-                    label = "¿$condition?",
-                    x = 50.dp,
-                    y = yPos,
-                    width = 120.dp,
-                    height = 80.dp,
-                    textColor = config.siTextColor,
-                    fillColor = config.siBackColor
-                )
-                nodes.add(siNode)
-                connections.add(DiagramConnection(lastNodeId, nodeId, "Sí"))
-                nodeStack.add(nodeId)
-                nodeId++
-                yPos += 120.dp
-            }
-
-            // ──── MIENTRAS (Bucle) ────
-            line.startsWith("MIENTRAS", ignoreCase = true) -> {
-                val condition = extractCondition(line)
-                val whileNode = DiagramNode(
-                    id = nodeId,
-                    type = config.mientrasFigure,
-                    label = "¿$condition?",
-                    x = 50.dp,
-                    y = yPos,
-                    width = 120.dp,
-                    height = 80.dp,
-                    textColor = config.mientrasTextColor,
-                    fillColor = config.mientrasBackColor
-                )
-                nodes.add(whileNode)
-                connections.add(DiagramConnection(lastNodeId, nodeId))
-                nodeStack.add(nodeId)
-                nodeId++
-                yPos += 120.dp
-            }
-
-            // ──── MOSTRAR (Salida) ────
-            line.startsWith("MOSTRAR", ignoreCase = true) -> {
-                val message = extractMessage(line)
-                val displayNode = DiagramNode(
-                    id = nodeId,
-                    type = ShapeType.PARALLELOGRAM,
-                    label = "Mostrar\n$message",
-                    x = 50.dp,
-                    y = yPos,
-                    width = 100.dp,
-                    height = 70.dp,
-                    textColor = config.bloqueTextColor,
-                    fillColor = config.bloqueBackColor
-                )
-                nodes.add(displayNode)
-                connections.add(DiagramConnection(lastNodeId, nodeId))
-                nodeStack.clear()
-                nodeStack.add(nodeId)
-                nodeId++
-                yPos += 100.dp
-            }
-
-            // ──── LEER (Entrada) ────
-            line.startsWith("LEER", ignoreCase = true) -> {
-                val varName = extractVariable(line)
-                val readNode = DiagramNode(
-                    id = nodeId,
-                    type = ShapeType.PARALLELOGRAM,
-                    label = "Leer\n$varName",
-                    x = 50.dp,
-                    y = yPos,
-                    width = 100.dp,
-                    height = 70.dp,
-                    textColor = config.bloqueTextColor,
-                    fillColor = config.bloqueBackColor
-                )
-                nodes.add(readNode)
-                connections.add(DiagramConnection(lastNodeId, nodeId))
-                nodeStack.clear()
-                nodeStack.add(nodeId)
-                nodeId++
-                yPos += 100.dp
-            }
-
-            // ──── VAR, ASIGNACIÓN (Instrucción general) ────
-            line.startsWith("VAR", ignoreCase = true) ||
-            line.contains("=") -> {
-                val label = if (line.length > 30) {
-                    line.take(27) + "..."
-                } else {
-                    line
-                }
-                val instructionNode = DiagramNode(
-                    id = nodeId,
-                    type = config.bloqueFigure,
-                    label = label,
-                    x = 50.dp,
-                    y = yPos,
-                    width = 120.dp,
-                    height = 60.dp,
-                    textColor = config.bloqueTextColor,
-                    fillColor = config.bloqueBackColor
-                )
-                nodes.add(instructionNode)
-                connections.add(DiagramConnection(lastNodeId, nodeId))
-                nodeStack.clear()
-                nodeStack.add(nodeId)
-                nodeId++
-                yPos += 90.dp
-            }
-
-            // ──── FINSI, FINMIENTRAS (Fin de bloques) ────
-            line.startsWith("FINSI", ignoreCase = true) ||
-            line.startsWith("FINMIENTRAS", ignoreCase = true) -> {
-                if (nodeStack.isNotEmpty()) {
-                    nodeStack.removeAt(nodeStack.size - 1)
-                }
-            }
-
-            else -> {
-                // Línea no reconocida o comentario
-            }
-        }
-
-        return Tuple4(nodes, connections, nodeId, yPos)
     }
 
     /** Extrae la condición de una línea SI o MIENTRAS */
@@ -262,11 +296,3 @@ object DiagramGenerator {
         }
     }
 }
-
-/** Clase auxiliar para retornar múltiples valores */
-internal data class Tuple4(
-    val nodes: List<DiagramNode>,
-    val connections: List<DiagramConnection>,
-    val nodeId: Int,
-    val yPos: androidx.compose.ui.unit.Dp
-)

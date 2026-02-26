@@ -1,9 +1,9 @@
 package paboomi.practica1_compi1_1s_2026.backend.logic
 
 import java_cup.runtime.DefaultSymbolFactory
-import paboomi.practica1_compi1_1s_2026.backend.analyzer.Lexer
-import paboomi.practica1_compi1_1s_2026.backend.analyzer.Parser
-import paboomi.practica1_compi1_1s_2026.backend.analyzer.sym
+import paboomi.practica1_compi1_1s_2026.backend.processer.Lexer
+import paboomi.practica1_compi1_1s_2026.backend.processer.Parser
+import paboomi.practica1_compi1_1s_2026.backend.processer.sym
 import java.io.StringReader
 
 /**
@@ -64,7 +64,7 @@ object ParserRunner {
         }
 
         // Agrega errores léxicos registrados por el propio Lexer
-        lexErrors.addAll(lexerForTokens.lexicalErrors ?: emptyList())
+        lexErrors.addAll(lexerForTokens.getLexicalErrors() ?: emptyList())
 
         /* ── Fase 2: Parser ─────────────────────────────────────
            Usamos un segundo StringReader (el Lexer es stateful,
@@ -94,7 +94,7 @@ object ParserRunner {
             }
         }
         // Siempre recogemos los errores que el parser pudo acumular
-        synErrors.addAll(parser.syntaxErrors)
+        synErrors.addAll(parser.getSyntaxErrors())
 
         return CompileResult(
             tokens = tokens,

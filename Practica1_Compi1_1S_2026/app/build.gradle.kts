@@ -35,6 +35,11 @@ android {
     buildFeatures {
         compose = true
     }
+    sourceSets {
+        getByName("main") {
+            java.srcDirs("src/main/java", "src/main/java/paboomi/practica1_compi1_1s_2026/backend/analyzer")
+        }
+    }
 }
 
 dependencies {
@@ -46,6 +51,14 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.navigation.runtime.ktx)
+    implementation(libs.ads.mobile.sdk)
+    implementation(libs.androidx.navigation.compose)
+    // https://mvnrepository.com/artifact/de.jflex/cup_runtime
+    implementation("de.jflex:cup_runtime:11b-20160615")
+    // https://mvnrepository.com/artifact/com.itextpdf/itextpdf
+    implementation("com.itextpdf:itextpdf:5.5.13.3")
+    implementation(libs.androidx.room.external.antlr)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

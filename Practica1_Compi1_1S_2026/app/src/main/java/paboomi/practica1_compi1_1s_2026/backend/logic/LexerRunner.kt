@@ -2,6 +2,8 @@ package paboomi.practica1_compi1_1s_2026.backend.analyzer
 
 import java.io.StringReader
 import paboomi.practica1_compi1_1s_2026.backend.logic.TokenData
+import paboomi.practica1_compi1_1s_2026.backend.processer.Lexer
+import paboomi.practica1_compi1_1s_2026.backend.processer.sym
 data class LexerResult(
     val tokens: List<TokenData>,
     val errors: List<String>

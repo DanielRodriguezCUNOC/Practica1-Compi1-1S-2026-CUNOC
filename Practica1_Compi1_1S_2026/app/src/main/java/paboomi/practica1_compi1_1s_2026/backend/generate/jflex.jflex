@@ -7,7 +7,6 @@ package paboomi.practica1_compi1_1s_2026.backend.analyzer;
 %cup
 %line
 %column
-%ignorecase
 
 %{
    /*---------------------------------------------
