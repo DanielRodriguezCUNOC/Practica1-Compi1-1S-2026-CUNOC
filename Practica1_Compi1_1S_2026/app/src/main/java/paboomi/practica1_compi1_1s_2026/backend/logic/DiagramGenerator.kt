@@ -17,14 +17,20 @@ object DiagramGenerator {
      * Genera un diagrama de flujo a partir del código pseudocódigo.
      * Retorna los nodos y conexiones necesarios para renderizar.
      */
-    fun generate(code: String, config: DiagramConfig = DiagramConfig()): DiagramResult {
+    fun generate(code: String): DiagramResult {
+        // Separar sección algoritmo y sección de configuración
+        val sepIdx = code.indexOf("%%%%")
+        val algoCode   = if (sepIdx != -1) code.substring(0, sepIdx) else code
+        val configCode = if (sepIdx != -1) code.substring(sepIdx + 4) else ""
+        val config = parseConfig(configCode)
+
         val nodes = mutableListOf<DiagramNode>()
         val connections = mutableListOf<DiagramConnection>()
 
-        // Limpiamos y normalizamos el código
-        val lines = code.split("\n")
+        // Limpiamos y normalizamos el código del algoritmo
+        val lines = algoCode.split("\n")
             .map { it.trim() }
-            .filter { it.isNotEmpty() && !it.startsWith("%") }
+            .filter { it.isNotEmpty() && !it.startsWith("#") }
 
         var nodeId = 0
         var yPos = 0.dp
@@ -67,7 +73,7 @@ object DiagramGenerator {
 
                     val siNode = DiagramNode(
                         id = nodeId,
-                        type = ShapeType.DIAMOND,
+                        type = config.siFigure,
                         label = "¿$condition?",
                         x = 50.dp,
                         y = yPos,
@@ -93,7 +99,7 @@ object DiagramGenerator {
 
                     val whileNode = DiagramNode(
                         id = nodeId,
-                        type = ShapeType.DIAMOND,
+                        type = config.mientrasFigure,
                         label = "¿$condition?",
                         x = 50.dp,
                         y = yPos,
@@ -177,7 +183,7 @@ object DiagramGenerator {
 
                     val instructionNode = DiagramNode(
                         id = nodeId,
-                        type = ShapeType.RECTANGLE,
+                        type = config.bloqueFigure,
                         label = label,
                         x = 50.dp,
                         y = yPos,
@@ -294,5 +300,122 @@ object DiagramGenerator {
         } else {
             "var"
         }
+    }
+
+    // ── Parseo de sección de configuración ──────────────────────────────────
+
+    /**
+     * Parsea el texto de la sección de configuración (después de %%%%)
+     * y devuelve un DiagramConfig con los valores encontrados.
+     * Las directivas no reconocidas o mal formadas se ignoran silenciosamente.
+     */
+    private fun parseConfig(configCode: String): DiagramConfig {
+        var siTextColor       = androidx.compose.ui.graphics.Color.Black
+        var siBackColor       = androidx.compose.ui.graphics.Color(0xFFE3F2FD)
+        var siFigure          = ShapeType.DIAMOND
+        var siFontSize        = 12
+
+        var mientrasTextColor = androidx.compose.ui.graphics.Color.Black
+        var mientrasBackColor = androidx.compose.ui.graphics.Color(0xFFF3E5F5)
+        var mientrasFigure    = ShapeType.DIAMOND
+        var mienstrasFontSize = 12
+
+        var bloqueTextColor   = androidx.compose.ui.graphics.Color.Black
+        var bloqueBackColor   = androidx.compose.ui.graphics.Color(0xFFF5F5F5)
+        var bloqueFigure      = ShapeType.RECTANGLE
+        var bloqueFontSize    = 12
+
+        configCode.split("\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it.contains("=") }
+            .forEach { line ->
+                val clean    = if (line.startsWith("%")) line.substring(1) else line
+                val eqIdx    = clean.indexOf("=")
+                if (eqIdx == -1) return@forEach
+
+                val directive = clean.substring(0, eqIdx).trim().uppercase()
+                // Quitar sufijo de prioridad (|N)
+                val value     = clean.substring(eqIdx + 1).trim().substringBefore("|").trim()
+
+                when (directive) {
+                    "FIGURA_SI"              -> siFigure          = parseFigure(value)
+                    "FIGURA_MIENTRAS"        -> mientrasFigure    = parseFigure(value)
+                    "FIGURA_BLOQUE"          -> bloqueFigure      = parseFigure(value)
+
+                    "COLOR_TEXTO_SI"         -> siTextColor       = parseColor(value)
+                    "COLOR_SI"               -> siBackColor       = parseColor(value)
+                    "COLOR_TEXTO_MIENTRAS"   -> mientrasTextColor = parseColor(value)
+                    "COLOR_MIENTRAS"         -> mientrasBackColor = parseColor(value)
+                    "COLOR_TEXTO_BLOQUE"     -> bloqueTextColor   = parseColor(value)
+                    "COLOR_BLOQUE"           -> bloqueBackColor   = parseColor(value)
+
+                    "LETRA_SIZE_SI"          -> siFontSize        = value.toIntOrNull() ?: 12
+                    "LETRA_SIZE_MIENTRAS"    -> mienstrasFontSize = value.toIntOrNull() ?: 12
+                    "LETRA_SIZE_BLOQUE"      -> bloqueFontSize    = value.toIntOrNull() ?: 12
+                }
+            }
+
+        return DiagramConfig(
+            siTextColor       = siTextColor,
+            siBackColor       = siBackColor,
+            siFigure          = siFigure,
+            siFontSize        = siFontSize,
+            mientrasTextColor = mientrasTextColor,
+            mientrasBackColor = mientrasBackColor,
+            mientrasFigure    = mientrasFigure,
+            mienstrasFontSize = mienstrasFontSize,
+            bloqueTextColor   = bloqueTextColor,
+            bloqueBackColor   = bloqueBackColor,
+            bloqueFigure      = bloqueFigure,
+            bloqueFontSize    = bloqueFontSize
+        )
+    }
+
+    /** Convierte nombre de figura del lenguaje de config a ShapeType */
+    private fun parseFigure(value: String): ShapeType = when (value.uppercase().trim()) {
+        "ELIPSE", "CIRCULO"                   -> ShapeType.OVAL
+        "RECTANGULO", "RECTANGULO_REDONDEADO" -> ShapeType.RECTANGLE
+        "ROMBO"                               -> ShapeType.DIAMOND
+        "PARALELOGRAMO"                       -> ShapeType.PARALLELOGRAM
+        else                                  -> ShapeType.DIAMOND
+    }
+
+    /**
+     * Parsea un color en formato:
+     *  - HEX: H seguido de 6 dígitos hexadecimales (ej. HFF00AA)
+     *  - RGB: tres enteros separados por coma (ej. 255,128,0)
+     *         Los valores pueden incluir aritmética simple (+/-)
+     */
+    private fun parseColor(value: String): androidx.compose.ui.graphics.Color {
+        val v = value.trim()
+        if (v.matches(Regex("H[0-9A-Fa-f]{6}"))) {
+            val r = v.substring(1, 3).toInt(16)
+            val g = v.substring(3, 5).toInt(16)
+            val b = v.substring(5, 7).toInt(16)
+            return androidx.compose.ui.graphics.Color(r / 255f, g / 255f, b / 255f)
+        }
+        val parts = v.split(",")
+        if (parts.size == 3) {
+            val r = evalSimple(parts[0].trim()).coerceIn(0, 255)
+            val g = evalSimple(parts[1].trim()).coerceIn(0, 255)
+            val b = evalSimple(parts[2].trim()).coerceIn(0, 255)
+            return androidx.compose.ui.graphics.Color(r / 255f, g / 255f, b / 255f)
+        }
+        return androidx.compose.ui.graphics.Color.Black
+    }
+
+    /**
+     * Evalúa expresiones aritméticas simples (suma y resta de enteros).
+     * Ej: "45-5" → 40, "10+2" → 12, "128" → 128
+     */
+    private fun evalSimple(expr: String): Int {
+        val e = expr.trim()
+        val plusIdx = e.lastIndexOf('+')
+        if (plusIdx > 0)
+            return evalSimple(e.substring(0, plusIdx)) + evalSimple(e.substring(plusIdx + 1))
+        val minusIdx = e.lastIndexOf('-')
+        if (minusIdx > 0)
+            return evalSimple(e.substring(0, minusIdx)) - evalSimple(e.substring(minusIdx + 1))
+        return e.toIntOrNull() ?: 0
     }
 }
