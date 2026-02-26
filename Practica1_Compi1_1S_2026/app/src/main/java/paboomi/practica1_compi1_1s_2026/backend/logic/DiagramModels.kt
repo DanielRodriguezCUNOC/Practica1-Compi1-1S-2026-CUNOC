@@ -75,12 +75,22 @@ data class DiagramConfig(
 )
 
 /**
+ * Entrada de la tabla de símbolos: representa una variable declarada.
+ */
+data class SymbolData(
+    val name: String,
+    val value: String,   // valor inicial, o "-" si no tiene
+    val line: Int
+)
+
+/**
  * Resultado del generador de diagramas.
  * Contiene los nodos y conexiones necesarias para renderizar.
  */
 data class DiagramResult(
     val nodes: List<DiagramNode>,
-    val connections: List<DiagramConnection>
+    val connections: List<DiagramConnection>,
+    val symbols: List<SymbolData> = emptyList()
 ) {
     val isEmpty: Boolean get() = nodes.isEmpty()
     val nodeCount: Int get() = nodes.size
