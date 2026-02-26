@@ -524,14 +524,43 @@ public class Parser extends java_cup.runtime.lr_parser {
 
 
 
-    // Métodos para reporte de errores sintácticos
-    public void syntax_error(Symbol s) {
-        System.err.println("Error sintáctico en línea " + s.left + ", columna " + s.right + ": símbolo no esperado '" + s.value + "'");
+    /* --------------------------------------------------
+       Lista donde se acumulan los errores sintácticos.
+       El ParserRunner la recupera después de parse().
+       -------------------------------------------------- */
+    private java.util.List<String> syntaxErrors = new java.util.ArrayList<>();
+
+    public java.util.List<String> getSyntaxErrors() {
+        return syntaxErrors;
     }
-    
+
+    /**
+     * Se invoca en cada token inesperado (error recuperable).
+     * Añade el mensaje a la lista para mostrarlo en la UI.
+     */
+    @Override
+    public void syntax_error(Symbol s) {
+        String lexeme = (s.value != null) ? "'" + s.value + "'" : "(vacío)";
+        syntaxErrors.add(
+            "Error sintáctico en línea " + s.left +
+            ", columna " + s.right +
+            ": símbolo inesperado " + lexeme
+        );
+    }
+
+    /**
+     * Se invoca cuando el parser no puede recuperarse.
+     * Registra el error y lanza excepción para detener el análisis.
+     */
+    @Override
     public void unrecovered_syntax_error(Symbol s) throws java.lang.Exception {
-        System.err.println("Error sintáctico irrecuperable en línea " + s.left + ", columna " + s.right);
-        throw new Exception("Error sintáctico");
+        String lexeme = (s.value != null) ? "'" + s.value + "'" : "(vacío)";
+        syntaxErrors.add(
+            "Error irrecuperable en línea " + s.left +
+            ", columna " + s.right +
+            ": no se pudo continuar el análisis cerca de " + lexeme
+        );
+        throw new Exception("Error sintáctico irrecuperable");
     }
 
 
