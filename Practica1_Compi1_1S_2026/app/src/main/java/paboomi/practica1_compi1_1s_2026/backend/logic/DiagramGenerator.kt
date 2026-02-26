@@ -26,6 +26,43 @@ object DiagramGenerator {
 
         val nodes = mutableListOf<DiagramNode>()
         val connections = mutableListOf<DiagramConnection>()
+        val symbols = mutableListOf<SymbolData>()
+
+        // Extraer tabla de símbolos con números de línea reales
+        algoCode.split("\n").forEachIndexed { idx, rawLine ->
+            val line = rawLine.trim()
+            val lineNum = idx + 1
+            when {
+                line.startsWith("VAR", ignoreCase = true) -> {
+                    val rest = line.removePrefix("VAR").removePrefix("var").trim()
+                    if (rest.contains("=")) {
+                        val eqIdx = rest.indexOf("=")
+                        val name  = rest.substring(0, eqIdx).trim()
+                        val value = rest.substring(eqIdx + 1).trim()
+                        if (symbols.none { it.name == name })
+                            symbols.add(SymbolData(name, value, lineNum))
+                    } else if (rest.isNotEmpty()) {
+                        if (symbols.none { it.name == rest })
+                            symbols.add(SymbolData(rest, "-", lineNum))
+                    }
+                }
+                // Asignación simple: "x = expr" (no es VAR ni SI/MIENTRAS)
+                line.contains("=") &&
+                !line.startsWith("SI", ignoreCase = true) &&
+                !line.startsWith("MIENTRAS", ignoreCase = true) &&
+                !line.startsWith("VAR", ignoreCase = true) &&
+                !line.startsWith("#") -> {
+                    val eqIdx = line.indexOf("=")
+                    val name  = line.substring(0, eqIdx).trim()
+                    // Solo variables simples (sin espacios, sin operadores)
+                    if (name.matches(Regex("[a-zA-Z_][a-zA-Z0-9_]*")) &&
+                        symbols.none { it.name == name }) {
+                        val value = line.substring(eqIdx + 1).trim()
+                        symbols.add(SymbolData(name, value, lineNum))
+                    }
+                }
+            }
+        }
 
         // Limpiamos y normalizamos el código del algoritmo
         val lines = algoCode.split("\n")
@@ -264,7 +301,7 @@ object DiagramGenerator {
         nodes.add(endNode)
         connections.add(DiagramConnection(lastNodeId, nodeId))
 
-        return DiagramResult(nodes, connections)
+        return DiagramResult(nodes, connections, symbols)
     }
 
     /** Extrae la condición de una línea SI o MIENTRAS */

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import paboomi.practica1_compi1_1s_2026.backend.logic.TokenData
 import paboomi.practica1_compi1_1s_2026.backend.logic.DiagramResult
+import paboomi.practica1_compi1_1s_2026.backend.logic.SymbolData
 import paboomi.practica1_compi1_1s_2026.ui.diagrams.DiagramCanvas
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,7 +65,7 @@ fun DiagramScreen(
 
     // Cuando llega el resultado con errores, saltar automáticamente a tab Errores
     LaunchedEffect(hasErrors) {
-        if (hasErrors) selectedTab = 2
+        if (hasErrors) selectedTab = 3
     }
 
     Scaffold(
@@ -128,10 +129,17 @@ fun DiagramScreen(
                         enabled = !hasErrors,
                         text = { Text("Tokens (${tokens.size})") }
                     )
-                    // Tab de errores siempre accesible
+                    // Tab de símbolos (variables), bloqueado con errores
                     Tab(
                         selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
+                        onClick = { if (!hasErrors) selectedTab = 2 },
+                        enabled = !hasErrors,
+                        text = { Text("Símbolos (${diagram.symbols.size})") }
+                    )
+                    // Tab de errores siempre accesible
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
                         text = { Text("Errores (${errors.size})") }
                     )
                 }
@@ -139,7 +147,8 @@ fun DiagramScreen(
                 when (selectedTab) {
                     0 -> DiagramContent(diagram)
                     1 -> TokensContent(tokens)
-                    2 -> ErrorsContent(errors)
+                    2 -> SymbolsContent(diagram.symbols)
+                    3 -> ErrorsContent(errors)
                 }
             }
         }
@@ -302,6 +311,93 @@ private fun TokenTableRow(
             color = if (isHeader) MaterialTheme.colorScheme.onPrimaryContainer
             else MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+@Composable
+private fun SymbolsContent(symbols: List<SymbolData>) {
+    if (symbols.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "No se declararon variables.",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+        }
+        return
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Encabezado
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("#",        modifier = Modifier.weight(0.07f), textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text("Variable", modifier = Modifier.weight(0.35f).padding(start = 4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text("Valor inicial", modifier = Modifier.weight(0.43f).padding(start = 4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text("Línea", modifier = Modifier.weight(0.15f), textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
+
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            itemsIndexed(symbols) { index, sym ->
+                val bgColor = if (index % 2 == 0)
+                    MaterialTheme.colorScheme.surface
+                else
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(bgColor)
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("${index + 1}",
+                        modifier = Modifier.weight(0.07f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.onSurface)
+                    Text(sym.name,
+                        modifier = Modifier.weight(0.35f).padding(start = 4.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(sym.value,
+                        modifier = Modifier.weight(0.43f).padding(start = 4.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.tertiary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${sym.line}",
+                        modifier = Modifier.weight(0.15f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.onSurface)
+                }
+                HorizontalDivider(
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                )
+            }
+        }
     }
 }
 
