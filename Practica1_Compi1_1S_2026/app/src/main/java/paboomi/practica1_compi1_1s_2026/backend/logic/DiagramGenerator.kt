@@ -27,8 +27,9 @@ object DiagramGenerator {
         val nodes = mutableListOf<DiagramNode>()
         val connections = mutableListOf<DiagramConnection>()
         val symbols = mutableListOf<SymbolData>()
+        val controlStructures = mutableListOf<ControlStructure>()
 
-        // Extraer tabla de símbolos con números de línea reales
+        // Extraer tabla de símbolos y estructuras de control con números de línea reales
         algoCode.split("\n").forEachIndexed { idx, rawLine ->
             val line = rawLine.trim()
             val lineNum = idx + 1
@@ -46,7 +47,17 @@ object DiagramGenerator {
                             symbols.add(SymbolData(rest, "-", lineNum))
                     }
                 }
-                // Asignación simple: "x = expr" (no es VAR ni SI/MIENTRAS)
+                // Detección de SI
+                line.startsWith("SI", ignoreCase = true) &&
+                !line.startsWith("FINSI", ignoreCase = true) -> {
+                    controlStructures.add(ControlStructure("SI", lineNum, extractCondition(line)))
+                }
+                // Detección de MIENTRAS
+                line.startsWith("MIENTRAS", ignoreCase = true) &&
+                !line.startsWith("FINMIENTRAS", ignoreCase = true) -> {
+                    controlStructures.add(ControlStructure("MIENTRAS", lineNum, extractCondition(line)))
+                }
+                // Asignación simple: "x = expr"
                 line.contains("=") &&
                 !line.startsWith("SI", ignoreCase = true) &&
                 !line.startsWith("MIENTRAS", ignoreCase = true) &&
@@ -54,7 +65,6 @@ object DiagramGenerator {
                 !line.startsWith("#") -> {
                     val eqIdx = line.indexOf("=")
                     val name  = line.substring(0, eqIdx).trim()
-                    // Solo variables simples (sin espacios, sin operadores)
                     if (name.matches(Regex("[a-zA-Z_][a-zA-Z0-9_]*")) &&
                         symbols.none { it.name == name }) {
                         val value = line.substring(eqIdx + 1).trim()
@@ -301,7 +311,8 @@ object DiagramGenerator {
         nodes.add(endNode)
         connections.add(DiagramConnection(lastNodeId, nodeId))
 
-        return DiagramResult(nodes, connections, symbols)
+        val operators = extractOperators(algoCode)
+        return DiagramResult(nodes, connections, symbols, operators, controlStructures)
     }
 
     /** Extrae la condición de una línea SI o MIENTRAS */
@@ -337,6 +348,46 @@ object DiagramGenerator {
         } else {
             "var"
         }
+    }
+
+    // ── Extracción de operadores aritméticos ───────────────────────────────
+
+    private fun extractOperators(algoCode: String): List<OperatorOccurrence> {
+        val result = mutableListOf<OperatorOccurrence>()
+        algoCode.split("\n").forEachIndexed { idx, rawLine ->
+            val lineNum = idx + 1
+            val trimmed = rawLine.trim()
+            // Saltar comentarios y líneas vacías
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) return@forEachIndexed
+
+            var inString = false
+            var i = 0
+            while (i < rawLine.length) {
+                val c = rawLine[i]
+                when {
+                    c == '"'  -> { inString = !inString; i++; continue }
+                    inString  -> { i++; continue }
+                    c == '#'  -> break  // resto de línea es comentario
+                }
+                val col = i + 1
+                // Para el contexto: línea completa truncada a 30 chars
+                val ctx = trimmed.take(30)
+                // Revisar secuencias de 2 chars para no confundir == != >= <=
+                val next = if (i + 1 < rawLine.length) rawLine[i + 1] else ' '
+                when {
+                    c == '+' ->
+                        result.add(OperatorOccurrence("Suma",          "+", lineNum, col, ctx))
+                    c == '-' && next != '>' ->
+                        result.add(OperatorOccurrence("Resta",         "-", lineNum, col, ctx))
+                    c == '*' ->
+                        result.add(OperatorOccurrence("Multiplicación", "*", lineNum, col, ctx))
+                    c == '/' ->
+                        result.add(OperatorOccurrence("División",      "/", lineNum, col, ctx))
+                }
+                i++
+            }
+        }
+        return result
     }
 
     // ── Parseo de sección de configuración ──────────────────────────────────

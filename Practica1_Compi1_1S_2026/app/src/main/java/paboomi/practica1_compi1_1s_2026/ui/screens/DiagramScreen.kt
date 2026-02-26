@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -45,6 +46,8 @@ import androidx.compose.ui.unit.sp
 import paboomi.practica1_compi1_1s_2026.backend.logic.TokenData
 import paboomi.practica1_compi1_1s_2026.backend.logic.DiagramResult
 import paboomi.practica1_compi1_1s_2026.backend.logic.SymbolData
+import paboomi.practica1_compi1_1s_2026.backend.logic.OperatorOccurrence
+import paboomi.practica1_compi1_1s_2026.backend.logic.ControlStructure
 import paboomi.practica1_compi1_1s_2026.ui.diagrams.DiagramCanvas
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,7 +68,7 @@ fun DiagramScreen(
 
     // Cuando llega el resultado con errores, saltar automáticamente a tab Errores
     LaunchedEffect(hasErrors) {
-        if (hasErrors) selectedTab = 3
+        if (hasErrors) selectedTab = 5
     }
 
     Scaffold(
@@ -114,41 +117,42 @@ fun DiagramScreen(
                    ser accesible. Los tabs "Diagrama" y "Tokens" se deshabilitan
                    visualmente y sus clicks no tienen efecto.
                    ──────────────────────────────────────────────────────── */
-                TabRow(selectedTabIndex = selectedTab) {
-                    // Tab bloqueado cuando hay errores de compilación
-                    Tab(
-                        selected = selectedTab == 0,
+                ScrollableTabRow(
+                    selectedTabIndex = selectedTab,
+                    edgePadding = 0.dp
+                ) {
+                    Tab(selected = selectedTab == 0,
                         onClick = { if (!hasErrors) selectedTab = 0 },
                         enabled = !hasErrors,
-                        text = { Text("Diagrama") }
-                    )
-                    // Tab bloqueado cuando hay errores de compilación
-                    Tab(
-                        selected = selectedTab == 1,
+                        text = { Text("Diagrama") })
+                    Tab(selected = selectedTab == 1,
                         onClick = { if (!hasErrors) selectedTab = 1 },
                         enabled = !hasErrors,
-                        text = { Text("Tokens (${tokens.size})") }
-                    )
-                    // Tab de símbolos (variables), bloqueado con errores
-                    Tab(
-                        selected = selectedTab == 2,
+                        text = { Text("Tokens (${tokens.size})") })
+                    Tab(selected = selectedTab == 2,
                         onClick = { if (!hasErrors) selectedTab = 2 },
                         enabled = !hasErrors,
-                        text = { Text("Símbolos (${diagram.symbols.size})") }
-                    )
-                    // Tab de errores siempre accesible
-                    Tab(
-                        selected = selectedTab == 3,
-                        onClick = { selectedTab = 3 },
-                        text = { Text("Errores (${errors.size})") }
-                    )
+                        text = { Text("Símbolos (${diagram.symbols.size})") })
+                    Tab(selected = selectedTab == 3,
+                        onClick = { if (!hasErrors) selectedTab = 3 },
+                        enabled = !hasErrors,
+                        text = { Text("Operadores (${diagram.operators.size})") })
+                    Tab(selected = selectedTab == 4,
+                        onClick = { if (!hasErrors) selectedTab = 4 },
+                        enabled = !hasErrors,
+                        text = { Text("Control (${diagram.controlStructures.size})") })
+                    Tab(selected = selectedTab == 5,
+                        onClick = { selectedTab = 5 },
+                        text = { Text("Errores (${errors.size})") })
                 }
 
                 when (selectedTab) {
                     0 -> DiagramContent(diagram)
                     1 -> TokensContent(tokens)
                     2 -> SymbolsContent(diagram.symbols)
-                    3 -> ErrorsContent(errors)
+                    3 -> OperatorsContent(diagram.operators)
+                    4 -> ControlContent(diagram.controlStructures)
+                    5 -> ErrorsContent(errors)
                 }
             }
         }
@@ -396,6 +400,120 @@ private fun SymbolsContent(symbols: List<SymbolData>) {
                     thickness = 0.5.dp,
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OperatorsContent(operators: List<OperatorOccurrence>) {
+    if (operators.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("No se encontraron operadores aritméticos.",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+        }
+        return
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Encabezado
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            listOf("Operador" to 0.28f, "Línea" to 0.12f, "Columna" to 0.14f, "Ocurrencia" to 0.46f)
+                .forEach { (header, weight) ->
+                    Text(header, modifier = Modifier.weight(weight),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        textAlign = if (header != "Ocurrencia") TextAlign.Center else TextAlign.Start)
+                }
+        }
+        HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            itemsIndexed(operators) { index, op ->
+                val bg = if (index % 2 == 0) MaterialTheme.colorScheme.surface
+                         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                Row(
+                    modifier = Modifier.fillMaxWidth().background(bg)
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(op.operator, modifier = Modifier.weight(0.28f),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+                    Text("${op.line}", modifier = Modifier.weight(0.12f),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+                    Text("${op.column}", modifier = Modifier.weight(0.14f),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+                    Text(op.occurrence, modifier = Modifier.weight(0.46f).padding(start = 4.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, fontSize = 10.sp),
+                        color = MaterialTheme.colorScheme.tertiary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                HorizontalDivider(thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ControlContent(structures: List<ControlStructure>) {
+    if (structures.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("No se encontraron estructuras de control.",
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+        }
+        return
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Text("Objeto",     modifier = Modifier.weight(0.22f),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer, textAlign = TextAlign.Center)
+            Text("Línea",     modifier = Modifier.weight(0.15f),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer, textAlign = TextAlign.Center)
+            Text("Condición", modifier = Modifier.weight(0.63f).padding(start = 4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outline)
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            itemsIndexed(structures) { index, ctrl ->
+                val bg = if (index % 2 == 0) MaterialTheme.colorScheme.surface
+                         else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                Row(
+                    modifier = Modifier.fillMaxWidth().background(bg)
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(ctrl.type, modifier = Modifier.weight(0.22f),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.primary, textAlign = TextAlign.Center)
+                    Text("${ctrl.line}", modifier = Modifier.weight(0.15f),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
+                    Text(ctrl.condition, modifier = Modifier.weight(0.63f).padding(start = 4.dp),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace, fontSize = 11.sp),
+                        color = MaterialTheme.colorScheme.tertiary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                HorizontalDivider(thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             }
         }
     }
